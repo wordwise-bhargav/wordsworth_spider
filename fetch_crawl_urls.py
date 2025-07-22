@@ -1,7 +1,6 @@
 import re
 import ray
 import sys
-import json
 import time
 import asyncio
 import aiohttp
@@ -67,12 +66,12 @@ class OptimizedVisitedSet:
         """Get all visited URLs as a list."""
         return list(self.visited)
 
-
 class UrlCrawler:
     """Optimized web crawler using Ray for parallel processing and async I/O."""
 
-    def __init__(self, url):
+    def __init__(self, url, queue):
         self.url = url
+        self.queue = queue
 
     def format_status(self, to_process, total_collected, rate=0.0):
         """Format the status line for progress display."""
@@ -129,13 +128,16 @@ class UrlCrawler:
                 if 'text/html' not in content_type:
                     return new_links
 
-                # Read content with size limit (10MB)
+                # Read content with size limit (50MB)
                 content = await response.read()
-                if len(content) > 10 * 1024 * 1024:
+                if len(content) > 50 * 1024 * 1024:
                     return new_links
 
                 soup = BeautifulSoup(content, "html.parser")
                 links_to_check = []
+
+                # Add the extracted data to the common queue for analysis
+                self.queue.put((url, soup.get_text(separator="\n", strip=True)))
 
                 for a_tag in soup.find_all("a", href=True):
                     href = a_tag['href'] # type: ignore
@@ -335,7 +337,8 @@ class UrlCrawler:
 
     def __enter__(self):
         # Initialize Ray with optimized configuration
-        ray.init(num_cpus=None)  # Use all available CPUs
+        if not ray.is_initialized():
+            ray.init(num_cpus=None)  # Use all available CPUs
 
         return self
 
