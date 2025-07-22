@@ -29,10 +29,12 @@ The script is executed from the command line and requires the site's name and UR
 ### Basic Usage
 
 ```bash
-python your_script_name.py "Site Name" "https://example.com"
+python your_script_name.py --type <number[1 or 2]> "Site Name" "https://example.com"
 ```
 
 * `your_script_name.py`: Replace this with the actual name of your Python script (e.g., `main.py`).
+
+* `<number>`: Replace with either 1 - Sitemap with crawl fallback or 2 - Crawl only
 
 * `"Site Name"`: A descriptive name for the website (e.g., `"My Blog"`). This will be used in the output JSON filename.
 
