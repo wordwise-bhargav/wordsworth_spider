@@ -10,6 +10,8 @@ from datetime import datetime
 from collections import deque
 from urllib.parse import urljoin, urlparse, unquote, quote
 
+from helper import analyze_text
+
 # Set of file extensions to ignore (assets)
 IGNORE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico",
@@ -133,11 +135,13 @@ class UrlCrawler:
                 if len(content) > 50 * 1024 * 1024:
                     return new_links
 
-                soup = BeautifulSoup(content, "html.parser")
+                soup = BeautifulSoup(content, "lxml")
                 links_to_check = []
 
                 # Add the extracted data to the common queue for analysis
-                self.queue.put((url, soup.get_text(separator="\n", strip=True)))
+                #self.queue.put((url, soup.get_text(separator="\n", strip=True)))
+                analysis = analyze_text((url, soup.get_text(separator="\n", strip=True)))
+                self.queue.put((url, analysis))
 
                 for a_tag in soup.find_all("a", href=True):
                     href = a_tag['href'] # type: ignore

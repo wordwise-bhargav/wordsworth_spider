@@ -1,9 +1,11 @@
+from typing import Tuple
 import ray
 import json
 import re
 from langdetect import detect, DetectorFactory
 from collections import defaultdict
 from typing import Dict, List
+import threading
 
 # Ensure consistent language detection
 DetectorFactory.seed = 42
@@ -34,9 +36,9 @@ def detect_language_chunks(text: str, chunk_size: int = 50) -> Dict[str, int]:
 
 @ray.remote
 class LanguageAnalyzer:
-    def analyze_text(self, obj: dict) -> dict:
-        url = obj.get("url")
-        text = clean_text(obj.get("data", ""))
+    def analyze_text(self, obj: Tuple[str, str]) -> dict:
+        url, raw_content = obj
+        text = clean_text(raw_content)
 
         if not text:
             return {}
@@ -61,39 +63,54 @@ class LanguageAnalyzer:
             "total_counted_words": page_total
         }
 
-class ParallelLangDetectionProcessor:
-    def __init__(self, input_path: str, output_path: str):
-        self.input_path = input_path
+class ParallelLangDetectionProcessorQueue:
+    def __init__(self, queue, output_path="language_analysis.json"):
+        self.queue = queue
         self.output_path = output_path
+        self.analyzer = LanguageAnalyzer.remote()
+        self.results = []
+        self.result_refs = []
+        self._stop = False
 
-    def run(self):
-        ray.init(num_cpus=None)
-        analyzer = LanguageAnalyzer.remote()
-
-        with open(self.input_path, "r", encoding="utf-8") as f:
-            lines = []
-            for line in f:
-                line = line.strip()
-                if not line:
+    def consume_queue(self):
+        """Continuously consume from queue and send to Ray actor."""
+        with open("analysis_log.txt", "a", encoding="utf-8") as log_file:
+            while not self._stop or not self.queue.empty():
+                try:
+                    obj = self.queue.get(timeout=1)
+                    url, _ = obj
+                except Exception:
                     continue
                 try:
-                    lines.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue  # Skip bad lines
+                    log_file.write(f"Started analysis for {url}\n")
+                    log_file.flush()
 
+                    ref = self.analyzer.analyze_text.remote(obj)
+                    self.result_refs.append(ref)
+                except Exception:
+                    log_file.write(f"Analysis failed for {url}\n")
+                    log_file.flush()
+                    continue  # Timeout, keep looping
 
-        futures = [analyzer.analyze_text.remote(obj) for obj in lines] # type: ignore
-        results = ray.get(futures)
+    def run(self):
+        consumer_thread = threading.Thread(target=self.consume_queue)
+        consumer_thread.start()
 
+        consumer_thread.join()
+
+        # Gather results
+        results = ray.get(self.result_refs)
+        results = [r for r in results if r]  # remove empty ones
+
+        print(f"\nWriting the output analysis to {self.output_path}")
+
+        # Generate summary and write it to file at output_path
         summary, pages = self._build_summary(results)
-
         with open(self.output_path, "w", encoding="utf-8") as f:
             json.dump({
                 "summary": summary,
                 "pages": pages
             }, f, indent=2, ensure_ascii=False)
-
-        ray.shutdown()
 
     def _build_summary(self, results: List[dict]):
         total_lang_counts = defaultdict(int)
@@ -121,6 +138,5 @@ class ParallelLangDetectionProcessor:
 
         return summary, pages
 
-if __name__ == "__main__":
-    processor = ParallelLangDetectionProcessor("output.jsonl", "language_analysis.json")
-    processor.run()
+    def stop(self):
+        self._stop = True

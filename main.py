@@ -2,10 +2,12 @@ import json
 import argparse
 from datetime import datetime
 from nt import cpu_count
+import threading
 import ray
 from ray.util.queue import Queue
 from fetch_crawl_urls import UrlCrawler
 from fetch_sitemap_urls import SitemapAnalyzer
+from lang_analyzer_fast import LanguageAnalyzer, ParallelLangDetectionProcessorQueue
 
 # Initialize ray (Configure to use all available CPUs)
 ray.init(num_cpus=None)
@@ -39,8 +41,7 @@ parser.add_argument(
 # Helper function to write data to JSON file
 def write_to_json(urls: list, type: str) -> None:
     args = parser.parse_args()
-    name = args.name
-    name = name.lower().replace(" ", "_")
+    name = args.name.lower().replace(" ", "_")
     with open(f"{name}_{type}_urls.json", "w", encoding="utf-8") as f:
         json.dump(urls, f, indent=2, ensure_ascii=False)
         print(f"Saved URLs to {name}_{type}_urls.json")
@@ -54,23 +55,33 @@ def main():
         url = args.url
         run_type = int(args.type) if args.type else 1
 
+        name = args.name.lower().replace(" ", "_")
+        lang_analysis_output_path = f"{name}_language_analysis.json"
+
         # Print the start time
         print(f"--- Start time: {datetime.now().strftime('%H:%M:%S')} ---\n")
 
         # If `run type` is 2 - URL Crawler, then directly crawl the site
         if run_type == 2:
+
+            #processor = ParallelLangDetectionProcessorQueue(data_queue, lang_analysis_output_path)
+            #analysis_thread = threading.Thread(target=processor.run)
+            #analysis_thread.start()
+
             with UrlCrawler(url, data_queue) as scraper:
                 max_pages = int(args.max_pages) if args.max_pages else None
                 scraped_links = scraper.scrape_all_links(max_pages)
-                print(f"\nCollected {len(scraped_links)} URLs for analysis")
+                print(f"\n\nCollected {len(scraped_links)} URLs for analysis")
                 write_to_json(list(scraped_links), "crawled")
 
                 queue_data = []
                 while not data_queue.empty():
                     url, content = data_queue.get()
                     queue_data.append({"url": url, "content": content})
-                    with open('queue_dump.json', "w") as f:
-                        json.dump(queue_data, f, indent=2)
+                write_to_json(queue_data, "queue_dump")
+                #print("\nStopped queuing service")
+                #processor.stop()
+                #analysis_thread.join()
 
         # Any other `run_type`, run the analysis with sitemap urls
         # with crawling as fallback
