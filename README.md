@@ -49,7 +49,7 @@ A high-performance, distributed website analyzer built using `Ray`, `asyncio`, a
 Run the scraper with:
 
 ```bash
-python main.py <sitename> <url>
+    python main.py <sitename> <url>
 ```
 
 This will:
