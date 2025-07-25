@@ -33,7 +33,8 @@ parser.add_argument(
     "--max_pages",
     help="Max pages to analyse",
     type=int,
-    required=False)
+    required=False
+)
 
 # Helper function to write data to JSON file
 def write_to_json(urls: list, type: str) -> None:
@@ -50,7 +51,6 @@ def main():
         # Get the `url` and `run_type` arguments
         args = parser.parse_args()
         url = args.url
-        run_type = int(args.type) if args.type else 1
 
         name = args.name.lower().replace(" ", "_")
         stream_output_path = f"outputs/{name}_site_data.jsonl"

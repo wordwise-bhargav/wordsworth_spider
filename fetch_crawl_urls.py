@@ -140,7 +140,7 @@ class UrlCrawler:
 
                 # Add the extracted data to the common file for analysis
                 with jsonlines.open(self.file_name, mode='a') as writer:
-                    writer.write({"url": url, "value": soup.get_text(separator="\n", strip=True)})
+                    writer.write({"url": url, "content": soup.get_text(separator="\n", strip=True)})
 
                 for a_tag in soup.find_all("a", href=True):
                     href = a_tag['href'] # type: ignore
