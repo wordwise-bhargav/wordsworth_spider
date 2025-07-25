@@ -6,7 +6,9 @@ __pycache__/
 
 # Backup files and directories
 backup/
+yab/
 
-# JSON files
+# Outputs / JSON files
+outputs/
 *.json
 *.jsonl

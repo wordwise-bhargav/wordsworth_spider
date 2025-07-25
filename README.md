@@ -1,94 +1,133 @@
-# Website URL Analyzer
+"""
+# Indian Language Web Analyzer
 
-This Python script helps you extract URLs from a website, either by analyzing its sitemap or by crawling its pages. It's useful for SEO analysis, content auditing, or simply getting a comprehensive list of pages on a given domain.
+A high-performance, distributed website analyzer built using `Ray`, `asyncio`, and `aiohttp`. It scrapes sitemap-based or crawl-discovered pages and analyzes the content for Indian language distribution (including English) using fast, adaptive concurrency control.
+
+---
 
 ## Features
 
-* **Sitemap Analysis:** Prioritizes fetching URLs from the site's `sitemap.xml` for a quick and efficient way to get a list of indexed pages.
+- Concurrent HTML scraping using `Ray` + `aiohttp` + `asyncio`
+- Adaptive throttling based on server response (backs off on high error rate)
+- Language detection for 12 Indian languages + English
+- Full site summary + per-page word distribution in JSON format
+- Fail-safe retry logic with exponential backoff
+- Automatically scales based on available CPU cores
 
-* **Website Crawling:** If a sitemap is not found or is ineffective, the script falls back to crawling the website to discover links.
+---
 
-* **Configurable Page Limit:** When crawling, you can specify a maximum number of pages to analyze.
+## Supported Languages
 
-* **JSON Output:** Saves the extracted URLs into a JSON file for easy processing and storage.
+- English (`en`)
+- Hindi (`hi`)
+- Bengali (`bn`)
+- Telugu (`te`)
+- Marathi (`mr`)
+- Tamil (`ta`)
+- Urdu (`ur`)
+- Gujarati (`gu`)
+- Kannada (`kn`)
+- Malayalam (`ml`)
+- Odia (`or`)
+- Punjabi (`pa`)
+- Assamese (`as`)
 
-## Prerequisites
+---
 
-This script relies on two external modules: `fetch_crawl_urls` and `fetch_sitemap_urls`. You would typically have these as separate Python files (`fetch_crawl_urls.py` and `fetch_sitemap_urls.py`) in the same directory as this script.
+## Installation
 
-All required dependencies can be installed from the `requirements.txt` file.
+1. Clone the repository
+2. (Optional but recommended) Create a virtual environment:
+```bash
+    python -m venv .venv && source .venv/bin/activate   # (Linux/macOS)
+```
+or
+```bash
+    python -m venv .venv && .venv\Scripts\activate      # (Windows)
+```
+3. Install dependencies:
+```bash
+    pip install -r requirements.txt
+```
+---
+
+## 🏃 Usage
+
+### Scraping + Saving HTML Text
+
+Run the scraper with:
 
 ```bash
-pip install -r requirements.txt
+python main.py <sitename> <url>
 ```
 
-## How to Run
+This will:
+- Fetch and parse the sitemap (or crawl if sitemap fails)
+- Scrape pages concurrently
+- Save:
+  - `outputs/<sitename>_site_data.jsonl`    → scraped clean text content
+  - `outputs/<sitename>_sitemap_urls.json`  → collected URLs
+  - `outputs/<sitename>_errors.jsonl`       → any failed requests
 
-The script is executed from the command line and requires the site's name and URL as arguments.
-
-### Basic Usage
+You can also limit pages:
 
 ```bash
-python your_script_name.py --type <number[1 or 2]> "Site Name" "https://example.com"
+    python main.py <sitename> <url> --max_pages 50
 ```
 
-* `your_script_name.py`: Replace this with the actual name of your Python script (e.g., `main.py`).
+---
 
-* `<number>`: Replace with either 1 - Sitemap with crawl fallback or 2 - Crawl only
+## Language Analysis
 
-* `"Site Name"`: A descriptive name for the website (e.g., `"My Blog"`). This will be used in the output JSON filename.
+After scraping:
 
-* `"https://example.com"`: The full URL of the website you want to analyze.
-
-### With Max Pages (for crawling)
-
-If the sitemap is ineffective or you explicitly want to limit the crawl, use the `--max_pages` argument:
+Run language detection and summarization:
 
 ```bash
-python your_script_name.py "My Blog" "https://myblog.com" --max_pages 100
+    python language_analysis.py
 ```
 
-This will limit the crawler to a maximum of 100 pages.
+This will produce:
 
-## Examples
+- `outputs/language_analysis.json`
+  A valid JSON file including:
+  - `pages`   → list of URLs and language stats
+  - `summary` → full-site word count and language distribution
 
-1. **Analyze a website using its sitemap (if available):**
+---
 
-```bash
-python main.py "Google" "https://www.google.com"
-```
+## Output Files
 
-This will attempt to find and parse `https://www.google.com/sitemap.xml` (or similar sitemap locations). If successful, it will save the URLs to `google_sitemap_urls.json`.
+- `outputs/site_data.jsonl`           → scraped content from all pages
+- `outputs/language_analysis.json`    → per-page and overall language distribution
+- `outputs/scrape_errors.jsonl`       → failed requests with error type
+- `outputs/<name>_sitemap_urls.json`  → URLs collected from sitemap
 
-2. **Crawl a website and limit to 50 pages:**
+---
 
-```bash
-python main.py "Tech News" "https://technews.com" --max_pages 50
-```
+## Configuration Notes
 
-If `technews.com` doesn't have an accessible sitemap, or if the sitemap analysis fails, the script will start crawling `technews.com` and stop after visiting 50 unique pages. The URLs will be saved to `tech_news_crawled_urls.json`.
+- Uses dynamic actor allocation based on system CPU count
+- Backoff & retry: 3 attempts with exponential delay
+- Connector concurrency: `limit_per_host=2`
+- Concurrency is automatically adjusted (throttled or scaled) during scraping
 
-## Output
+---
 
-The script will create a JSON file in the same directory where it's run. The filename will follow the pattern: `<site_name>_<type>_urls.json`.
+## Internals & Modules
 
-* `<site_name>`: The name you provided, converted to lowercase and spaces replaced with underscores (e.g., `google`, `tech_news`).
+- `sitemap_urls_crawler.py` → Fully adaptive Ray-based scraper
+- `fetch_sitemap_urls.py`   → Sitemap parsing logic
+- `language_analysis.py`    → Ray-parallelized language detection using langdetect
+- `requirements.txt`        → All pinned dependencies
 
-* `<type>`: Either `sitemap` (if URLs were found via sitemap) or `crawled` (if URLs were found via crawling).
+---
 
-The JSON file will contain a list of URLs, for example:
+## Tested With
 
-```json
-[
-"https://example.com/",
-"https://example.com/about",
-"https://example.com/contact",
-"https://example.com/blog/article-1",
-"https://example.com/blog/article-2"
-]
-```
+- Python 3.10+
+- Ray 2.48+
+- aiohttp 3.12+
+- tqdm, BeautifulSoup, lxml, langdetect
 
-
-## Error Handling
-
-The script includes basic error handling for `KeyboardInterrupt` (if you stop the script manually) and other general exceptions during execution.
+---

@@ -1,3 +1,4 @@
+import os
 import re
 import ray
 import sys
@@ -5,12 +6,11 @@ import time
 import asyncio
 import aiohttp
 import requests
+import jsonlines
 from bs4 import BeautifulSoup
 from datetime import datetime
 from collections import deque
 from urllib.parse import urljoin, urlparse, unquote, quote
-
-from helper import analyze_text
 
 # Set of file extensions to ignore (assets)
 IGNORE_EXTENSIONS = {
@@ -71,9 +71,9 @@ class OptimizedVisitedSet:
 class UrlCrawler:
     """Optimized web crawler using Ray for parallel processing and async I/O."""
 
-    def __init__(self, url, queue):
+    def __init__(self, url, file_name):
         self.url = url
-        self.queue = queue
+        self.file_name = file_name
 
     def format_status(self, to_process, total_collected, rate=0.0):
         """Format the status line for progress display."""
@@ -135,13 +135,12 @@ class UrlCrawler:
                 if len(content) > 50 * 1024 * 1024:
                     return new_links
 
-                soup = BeautifulSoup(content, "lxml")
+                soup = BeautifulSoup(content, "html.parser")
                 links_to_check = []
 
-                # Add the extracted data to the common queue for analysis
-                #self.queue.put((url, soup.get_text(separator="\n", strip=True)))
-                analysis = analyze_text((url, soup.get_text(separator="\n", strip=True)))
-                self.queue.put((url, analysis))
+                # Add the extracted data to the common file for analysis
+                with jsonlines.open(self.file_name, mode='a') as writer:
+                    writer.write({"url": url, "value": soup.get_text(separator="\n", strip=True)})
 
                 for a_tag in soup.find_all("a", href=True):
                     href = a_tag['href'] # type: ignore
@@ -231,6 +230,10 @@ class UrlCrawler:
             soup = BeautifulSoup(response.text, "html.parser")
             links_to_check = []
 
+            # Add the extracted data to the common file for analysis
+            with jsonlines.open(self.file_name, mode='a') as writer:
+                writer.write({"url": url, "value": soup.get_text(separator="\n", strip=True)})
+
             for a_tag in soup.find_all("a", href=True):
                 href = a_tag['href'] # type: ignore
                 if not href or href.startswith('#') or href.startswith('mailto:') or href.startswith('tel:'): # type: ignore
@@ -267,7 +270,7 @@ class UrlCrawler:
 
         return new_links
 
-    @ray.remote
+    @ray.remote(num_cpus=0.2)
     def async_crawl_batch(self, urls, base_netloc, visited_actor):
         """Ray remote function for asynchronous batch crawling."""
         return asyncio.run(self._async_crawl_batch(urls, base_netloc, visited_actor))
@@ -337,7 +340,7 @@ class UrlCrawler:
         return sorted(all_results)
 
     def close(self):
-        ray.shutdown()
+        return
 
     def __enter__(self):
         # Initialize Ray with optimized configuration
