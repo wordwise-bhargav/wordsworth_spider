@@ -43,7 +43,7 @@ or
     pip install -r requirements.txt
 ```
 
-## 🏃 Usage
+## Usage
 
 ### Scraping + Saving HTML Text
 
