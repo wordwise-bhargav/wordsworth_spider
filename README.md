@@ -1,9 +1,6 @@
-"""
 # Indian Language Web Analyzer
 
 A high-performance, distributed website analyzer built using `Ray`, `asyncio`, and `aiohttp`. It scrapes sitemap-based or crawl-discovered pages and analyzes the content for Indian language distribution (including English) using fast, adaptive concurrency control.
-
----
 
 ## Features
 
@@ -13,8 +10,6 @@ A high-performance, distributed website analyzer built using `Ray`, `asyncio`, a
 - Full site summary + per-page word distribution in JSON format
 - Fail-safe retry logic with exponential backoff
 - Automatically scales based on available CPU cores
-
----
 
 ## Supported Languages
 
@@ -31,8 +26,6 @@ A high-performance, distributed website analyzer built using `Ray`, `asyncio`, a
 - Odia (`or`)
 - Punjabi (`pa`)
 - Assamese (`as`)
-
----
 
 ## Installation
 
@@ -75,8 +68,6 @@ You can also limit pages:
     python main.py <sitename> <url> --max_pages 50
 ```
 
----
-
 ## Language Analysis
 
 After scraping:
@@ -94,16 +85,12 @@ This will produce:
   - `pages`   → list of URLs and language stats
   - `summary` → full-site word count and language distribution
 
----
-
 ## Output Files
 
 - `outputs/site_data.jsonl`           → scraped content from all pages
 - `outputs/language_analysis.json`    → per-page and overall language distribution
 - `outputs/scrape_errors.jsonl`       → failed requests with error type
 - `outputs/<name>_sitemap_urls.json`  → URLs collected from sitemap
-
----
 
 ## Configuration Notes
 
@@ -112,8 +99,6 @@ This will produce:
 - Connector concurrency: `limit_per_host=2`
 - Concurrency is automatically adjusted (throttled or scaled) during scraping
 
----
-
 ## Internals & Modules
 
 - `sitemap_urls_crawler.py` → Fully adaptive Ray-based scraper
@@ -121,13 +106,9 @@ This will produce:
 - `language_analysis.py`    → Ray-parallelized language detection using langdetect
 - `requirements.txt`        → All pinned dependencies
 
----
-
 ## Tested With
 
 - Python 3.10+
 - Ray 2.48+
 - aiohttp 3.12+
 - tqdm, BeautifulSoup, lxml, langdetect
-
----
