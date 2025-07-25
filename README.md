@@ -34,7 +34,6 @@ A high-performance, distributed website analyzer built using `Ray`, `asyncio`, a
 ```bash
     python -m venv .venv && source .venv/bin/activate   # (Linux/macOS)
 ```
-or
 ```bash
     python -m venv .venv && .venv\Scripts\activate      # (Windows)
 ```
