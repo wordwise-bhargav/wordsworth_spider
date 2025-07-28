@@ -1,0 +1,14 @@
+# Virtual environment
+.venv/
+
+# Python compiled files
+__pycache__/
+
+# Backup files and directories
+backup/
+yab/
+
+# Outputs / JSON files
+outputs/
+*.json
+*.jsonl
