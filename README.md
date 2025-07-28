@@ -57,6 +57,7 @@ This will:
 - Scrape pages concurrently
 - Save:
   - `outputs/<sitename>_site_data.jsonl`    → scraped clean text content
+  - `outputs/<sitename>_images_urls.jsonl`  → scraped URLs of images
   - `outputs/<sitename>_sitemap_urls.json`  → collected URLs
   - `outputs/<sitename>_errors.jsonl`       → any failed requests
 

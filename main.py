@@ -56,7 +56,7 @@ def main():
         stream_output_path = f"outputs/{name}_site_data.jsonl"
         stream_error_path = f"outputs/{name}_errors.jsonl"
         analysis_output_path = f"outputs/{name}_language_analysis.json"
-        images_output_path = f"outputs/{name}_images_urls.json"
+        images_output_path = f"outputs/{name}_images_urls.jsonl"
 
         # Ensure output directory exists
         os.makedirs("outputs", exist_ok=True)
