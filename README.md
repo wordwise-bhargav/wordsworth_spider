@@ -115,6 +115,7 @@ This will:
 * Scrape page content and images
 * Run per-page and overall language detection
 * Write results to the `outputs/` folder
+* Returns the summary of the analysis
 
 ---
 
