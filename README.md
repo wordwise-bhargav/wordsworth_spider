@@ -1,99 +1,201 @@
-# Web Content Analysis Platform
+# 🕷️ Web Content Analyzer
 
-The Web Content Analysis Platform is a sophisticated Python-based solution designed for the comprehensive extraction, scraping, and in-depth linguistic analysis of website content. Leveraging the power of `asyncio` for asynchronous operations and `Ray` for distributed computing, this platform ensures efficient and scalable processing of large volumes of web data.
+A fully automated and adaptive pipeline to:
 
-## Core Capabilities
+* Crawl websites or extract URLs from sitemaps
+* Scrape text and image URLs
+* Detect and analyze language distribution across pages
+* Output rich, structured analytics
 
--   **Intelligent URL Discovery**: The platform prioritizes the discovery of URLs via `robots.txt` and sitemaps (including gzipped and sitemap index formats) to efficiently map out website structure. In scenarios where sitemaps are absent or incomplete, it seamlessly transitions to a robust web crawling mechanism, intelligently navigating links within the designated domain to ensure thorough coverage.
--   **High-Performance Concurrent Scraping**: Employing `aiohttp` for asynchronous HTTP requests and `Ray` actors for parallel processing, the system can concurrently fetch and parse content from numerous URLs. This architecture significantly accelerates the data acquisition phase, making it suitable for large-scale web content collection.
--   **Rich Media Metadata Extraction**: Beyond text, the platform extracts valuable image URLs along with their associated `alt` attributes, providing crucial metadata for accessibility and content understanding, and noting the source page of each image.
--   **Advanced Linguistic Analysis**: A key feature of this platform is its ability to perform detailed language detection on scraped text content. It identifies various languages, including a strong focus on Indian languages. The analysis provides a granular breakdown of word counts and percentages for each detected language, offering insights into the linguistic composition of web pages and the entire site.
--   **Robust Error Management and Adaptive Control**: The system is engineered for resilience, incorporating multiple retry mechanisms, configurable timeouts, and dynamic concurrency adjustments. This adaptive control helps in gracefully handling network latencies, HTTP errors, and unresponsive servers, ensuring high data acquisition success rates.
--   **Structured Data Output**: All collected and analyzed data is meticulously organized and saved into industry-standard formats. Scraped content, image details, and comprehensive language analysis reports are outputted as JSONL and JSON files, facilitating easy integration with other data processing and analytical tools.
+Supports English and 12 Indian languages with intelligent crawling and fault-tolerant scraping using **Ray**, **asyncio**, and **aiohttp**.
 
-## Architectural Overview
+---
 
-The platform is modular, with distinct components handling specific functionalities:
+## 📦 Features
 
--   `main.py`: Serves as the primary orchestration module. It parses command-line arguments, initializes the `Ray` distributed environment, and coordinates the sequential execution of URL discovery, web scraping, and language analysis phases.
--   `fetch_sitemap_urls.py`: Dedicated to intelligent sitemap analysis. This module efficiently discovers sitemap locations from `robots.txt` and common paths, fetches sitemap (including gzipped) and sitemap index files, and parses them to extract a comprehensive list of URLs, while applying domain and file type filtering.
--   `sitemap_urls_crawler.py`: Manages the concurrent scraping of URLs obtained from the sitemap or crawling process. It utilizes `Ray` actors and `aiohttp` to asynchronously fetch page content, extract images, and record any errors, with an adaptive concurrency mechanism based on success rates.
--   `fetch_crawl_urls.py`: Acts as a robust fallback web crawler. If sitemap discovery is unsuccessful, this module systematically crawls web pages, extracts internal links, and adds them to the processing queue, respecting domain boundaries and avoiding non-content assets.
--   `language_analyzer.py`: Performs the core linguistic processing. It takes the scraped text content, cleans it, splits it into chunks for accurate language detection using `langdetect`, and then aggregates language statistics at both page and overall site levels.
--   `requirements.txt`: Lists all external Python libraries required for the project, ensuring easy and consistent environment setup.
+* 🌐 Sitemap-aware and fallback crawler
+* ⚡ High-speed async scraping with dynamic concurrency throttling
+* 🖼️ Image URL extraction
+* 🧠 Language detection on scraped content
+* 📊 Summary reports per page and overall
+* 🧵 Multiprocessing and distributed execution via **Ray**
 
-## Getting Started
+---
 
-To set up and run the Web Content Analysis Platform, follow these steps:
+## 🛠️ Installation
 
-### Prerequisites
-
--   Python 3.8+ installed.
--   Internet connectivity for web scraping.
-
-### Installation
-
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository_url>
-    cd web-content-analyzer
-    ```
-
-2.  **Create and activate a virtual environment (recommended for dependency isolation):**
-    ```bash
-    python -m venv venv
-    ```
-
-    Activate the environment:
-    ```bash
-    source venv/bin/activate  # Linux
-    ```
-    ```bash
-    venv\Scripts\activate     # Windows
-    ```
-
-3.  **Install the required Python dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *Note: The `ray` library may have additional system-level dependencies depending on your operating system. Refer to the official Ray documentation for specific installation notes if you encounter issues.*
-
-### Execution
-
-Run the `main.py` script from your terminal, providing the site name, URL, and an optional page limit:
+> Recommended: Use a virtual environment with [uv](https://github.com/astral-sh/uv)
 
 ```bash
-python main.py <site_name> <site_url> [--max_pages <number_of_pages>]
-````
+# Clone the repo
+git clone https://github.com/your-org/your-repo.git
+cd your-repo
 
-  - `<site_name>`: A user-friendly string to name the analysis output files (e.g., "Corporate\_Website"). This should be a single word or words separated by underscores to avoid file naming issues.
-  - `<site_url>`: The absolute URL of the target website (e.g., "https://www.example.com/"). The script will automatically normalize this URL.
-  - `--max_pages <number_of_pages>` (optional): An integer specifying the maximum number of unique web pages to crawl if sitemap analysis is ineffective or yields limited results. If omitted, the crawler will attempt to collect all discoverable links within the specified domain without an explicit page limit.
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 
-#### Usage Examples:
+# Install dependencies
+uv pip install -r requirements.txt
+```
 
-1.  **Standard Analysis (Sitemap first, then crawl if needed, no page limit):**
+### ✅ Requirements
 
-    ```bash
-    python main.py "Global_News" "[https://www.globalnews.com/](https://www.globalnews.com/)"
-    ```
+The core packages used include:
 
-2.  **Limited Crawl Analysis (Sitemap first, then crawl up to 500 pages if necessary):**
+* `aiohttp`
+* `beautifulsoup4`
+* `jsonlines`
+* `langdetect`
+* `ray`
+* `tqdm`
+* `lxml`
+* `requests`
 
-    ```bash
-    python main.py "Tech_Blog" "[https://www.techblog.net/](https://www.techblog.net/)" --max_pages 500
-    ```
+> You can find all required packages in `requirements.txt`.
 
-## Output Artifacts
+---
 
-Upon successful execution, the `outputs/` directory will contain the following files:
+## 🚀 CLI Usage
 
-  - `<site_name>_sitemap_urls.json` or `<site_name>_crawled_urls.json`: A JSON formatted file detailing all unique URLs identified either through sitemap parsing or web crawling, serving as the input for the scraping phase.
-  - `<site_name>_site_data.jsonl`: A JSON Lines file, where each line represents a scraped web page, containing its URL and the extracted, cleaned text content.
-  - `<site_name>_images_urls.jsonl`: A JSON Lines file, with each line detailing an extracted image, including its URL, associated `alt` text (if available), and the URL of the source page where it was found.
-  - `<site_name>_errors.jsonl`: A JSON Lines file that logs any URLs that could not be successfully processed, along with the encountered error or exception type.
-  - `<site_name>_language_analysis.json`: A comprehensive JSON file presenting the linguistic analysis results. It includes per-page language breakdowns (word counts and percentages) and an aggregated site-wide language distribution summary, offering insights into the primary languages used across the website.
+You can directly run the analyzer from CLI using:
 
-## Error Handling and Logging
+```bash
+python site_analyzer.py <name> <url> [--max_pages <N>]
+```
 
-The platform incorporates robust error handling to manage network interruptions, HTTP status errors, and parsing issues. Detailed warnings and errors are logged to the console and to the `_errors.jsonl` file to assist in debugging and understanding processing failures. `KeyboardInterrupt` is also gracefully handled, allowing for safe termination of the crawling process.
+### Parameters
+
+* `name`: Brand/site name (used for output filenames)
+* `url`: Starting URL of the website
+* `--max_pages`: (Optional) Limit for number of pages to crawl if sitemap fails
+
+### Example
+
+```bash
+python site_analyzer.py Wordwise https://www.wordwise.one/ --max_pages 500
+```
+
+---
+
+## 📁 Output Files
+
+All results are saved under the `outputs/` directory:
+
+| File                            | Description                           |
+| ------------------------------- | ------------------------------------- |
+| `<name>_site_data.jsonl`        | Scraped text content per page         |
+| `<name>_images_urls.jsonl`      | All image URLs discovered             |
+| `<name>_language_analysis.json` | Language distribution summary         |
+| `<name>_sitemap_urls.json`      | URLs from sitemap (if available)      |
+| `<name>_crawled_urls.json`      | URLs from crawling (if sitemap fails) |
+| `<name>_errors.jsonl`           | Failed fetches with error details     |
+
+---
+
+## 🧩 Programmatic Usage
+
+You can use the core components as importable Python modules:
+
+### Crawl Fallback
+
+```python
+from fetch_crawl_urls import UrlCrawler
+
+with UrlCrawler(url, output_jsonl, image_jsonl, error_file) as crawler:
+    all_links = crawler.scrape_all_links(max_pages=500)
+```
+
+### Sitemap Extraction
+
+```python
+from fetch_sitemap_urls import SitemapAnalyzer
+
+with SitemapAnalyzer("https://example.com") as analyzer:
+    urls, found = analyzer.get_all_urls()
+```
+
+### Async Ray-Based Scraper
+
+```python
+from sitemap_urls_crawler import RayAsyncScraper
+import asyncio
+
+scraper = RayAsyncScraper(
+    urls=urls,
+    output_file="outputs/data.jsonl",
+    images_file="outputs/images.jsonl",
+    error_file="outputs/errors.jsonl"
+)
+asyncio.run(scraper.scrape())
+```
+
+### Language Analysis
+
+```python
+from language_analyzer import run_language_analysis
+import asyncio
+
+asyncio.run(run_language_analysis(
+    input_path="outputs/data.jsonl",
+    output_path="outputs/language_summary.json"
+))
+```
+
+---
+
+## 🧪 Development and Testing
+
+You can test individual modules by running them directly. Example:
+
+```bash
+python language_analyzer.py
+```
+
+Or manually import and test functions in a notebook or interactive console.
+
+---
+
+## 📊 Supported Languages
+
+The system detects the following languages using `langdetect`:
+
+* English
+* Hindi
+* Bengali
+* Telugu
+* Marathi
+* Tamil
+* Urdu
+* Gujarati
+* Kannada
+* Malayalam
+* Odia
+* Punjabi
+* Assamese
+
+---
+
+## 🧹 Cleanup
+
+To reset outputs:
+
+```bash
+rm -rf outputs/*
+```
+
+---
+
+## 🧠 Behind the Scenes
+
+* **Adaptive concurrency:** Sitemap scraping dynamically reduces Ray actor count on error spikes.
+* **Normalized crawling:** Handles asset filtering, malformed links, netloc constraints.
+* **Resilient:** Handles encoding issues, huge files, timeouts, broken pages.
+
+---
+
+## ✅ Tips
+
+* Use `--max_pages` only when the sitemap fails.
+* Use `ray.init(num_cpus=<n>)` in script to limit CPU usage if needed.
+* Avoid using this on very large sites unless concurrency limits are tuned.
