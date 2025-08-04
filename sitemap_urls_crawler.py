@@ -27,11 +27,7 @@ class AsyncAiohttpFetcher:
 
                     with self.images_path.open("a", encoding="utf-8") as f:
                         for img in soup.find_all("img", src=True):
-                            f.write(json.dumps({
-                                "image_url": img["src"],
-                                "alt": img.get("alt"),
-                                "source_page": url
-                            }, ensure_ascii=False) + "\n")
+                            f.write(json.dumps(img["src"], ensure_ascii=False) + "\n")
 
                     return {
                         "url": url,
@@ -46,6 +42,17 @@ class AsyncAiohttpFetcher:
                         "exception_type": type(e).__name__
                     }
                 await asyncio.sleep(2 ** attempt)  # exponential backoff
+
+    async def fetch_single(self, url: str) -> dict:
+        """Fetch a single URL - for individual progress tracking"""
+        timeout = aiohttp.ClientTimeout(total=self.timeout)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; SitemapBot/1.0)"
+        }
+        connector = aiohttp.TCPConnector(limit_per_host=2)
+
+        async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
+            return await self._fetch(session, url)
 
     async def fetch(self, urls: List[str]) -> List[dict]:
         timeout = aiohttp.ClientTimeout(total=self.timeout)
@@ -92,51 +99,72 @@ class RayAsyncScraper:
     async def scrape(self):
         print(f"Starting scrape with up to {self.max_actors} Ray actors")
 
-        batches = self._split_batches()
         total = len(self.urls)
         progress = tqdm(total=total, desc="Scraping", unit="pages", bar_format="{desc}: {n_fmt}/{total_fmt} {bar} {rate_fmt}")
 
         successful, failed = [], []
-        batch_index = 0
 
-        while batch_index < len(batches):
-            current_batch_group = batches[batch_index:batch_index + self.cur_actors]
-            fetchers = [AsyncAiohttpFetcher.remote(images_path=self.images_file, timeout=60, max_retries=3) for _ in range(len(current_batch_group))]
-            tasks = []
+        # Create actors
+        fetchers = [AsyncAiohttpFetcher.remote(images_path=self.images_file, timeout=60, max_retries=3)
+                   for _ in range(self.cur_actors)]
 
-            for i, batch in enumerate(current_batch_group):
-                actor = fetchers[i]
-                tasks.append(actor.fetch.remote(batch))
+        # Submit all URLs as individual tasks
+        futures = []
+        for i, url in enumerate(self.urls):
+            actor = fetchers[i % self.cur_actors]
+            futures.append(actor.fetch_single.remote(url))
 
-            results_batches = ray.get(tasks)
+        # Process results as they complete
+        remaining_futures = futures[:]
+        recent_results = []  # Track recent results for adaptive control
 
-            temp_success, temp_failed = [], []
-            for batch_result in results_batches:
-                for item in batch_result:
-                    if "error" in item:
-                        temp_failed.append(item)
-                    else:
-                        temp_success.append(item)
+        while remaining_futures:
+            # Wait for at least one task to complete
+            ready, remaining_futures = ray.wait(remaining_futures, num_returns=min(10, len(remaining_futures)))
 
-            successful.extend(temp_success)
-            failed.extend(temp_failed)
-            progress.update(len(temp_success) + len(temp_failed))
+            # Process completed tasks
+            batch_success, batch_failed = [], []
+            for future in ready:
+                result = ray.get(future)
+                recent_results.append(result)
 
-            # Adaptive control
-            error_rate = len(temp_failed) / max(len(temp_success) + len(temp_failed), 1)
-            if error_rate > self.throttle_threshold and self.cur_actors > self.min_actors:
-                self.cur_actors -= 1
-                print(f"High error rate ({error_rate:.2%}). Reducing concurrency to {self.cur_actors} and throttling...")
-                await asyncio.sleep(5)
-            elif error_rate < 0.05 and self.cur_actors < self.max_actors:
-                self.cur_actors += 1
-                print(f"Error rate low. Increasing concurrency to {self.cur_actors}")
+                if "error" in result:
+                    batch_failed.append(result)
+                    failed.append(result)
+                else:
+                    batch_success.append(result)
+                    successful.append(result)
 
-            batch_index += len(current_batch_group)
+                progress.update(1)  # Update progress bar for each completed URL
 
+            # Adaptive control - check every 50 completed requests
+            if len(recent_results) >= 50:
+                error_rate = len([r for r in recent_results if "error" in r]) / len(recent_results)
+
+                if error_rate > self.throttle_threshold and self.cur_actors > self.min_actors:
+                    self.cur_actors -= 1
+                    print(f"\nHigh error rate ({error_rate:.2%}). Reducing concurrency to {self.cur_actors}")
+                    # Recreate actors with new count
+                    fetchers = [AsyncAiohttpFetcher.remote(images_path=self.images_file, timeout=60, max_retries=3)
+                               for _ in range(self.cur_actors)]
+                    await asyncio.sleep(2)
+
+                elif error_rate < 0.05 and self.cur_actors < self.max_actors:
+                    self.cur_actors += 1
+                    print(f"\nError rate low ({error_rate:.2%}). Increasing concurrency to {self.cur_actors}")
+                    # Recreate actors with new count
+                    fetchers = [AsyncAiohttpFetcher.remote(images_path=self.images_file, timeout=60, max_retries=3)
+                               for _ in range(self.cur_actors)]
+
+                recent_results = []  # Reset for next batch of monitoring
+
+        # Stream results to files
         self._stream_to_jsonl(self.output_path, successful)
         self._stream_to_jsonl(self.error_path, failed)
 
         progress.close()
-        print(f"\nScraped {len(successful)} pages → {self.output_path}")
+        print("\n----- Sitemap scraping summary -----")
+        print(f"Scraped {len(successful)} pages → {self.output_path}")
+        print(f"Scraped images → {self.images_file}")
         print(f"Failed {len(failed)} pages → {self.error_path}")
+        print("------------------------------------\n")

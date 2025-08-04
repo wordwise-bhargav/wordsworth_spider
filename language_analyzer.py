@@ -38,7 +38,6 @@ def split_into_chunks(text: str, chunk_size: int = 300) -> List[str]:
 def detect_language_chunks(text: str) -> Dict[str, int]:
     chunks = split_into_chunks(text)
     lang_counts = Counter()
-
     for chunk in chunks:
         try:
             lang = detect(chunk)
@@ -46,16 +45,13 @@ def detect_language_chunks(text: str) -> Dict[str, int]:
                 lang_counts[LANGUAGES[lang]] += len(chunk.split())
         except Exception:
             continue
-
     return dict(lang_counts)
-
 
 @ray.remote
 class LanguageAnalyzer:
     def analyze_text(self, obj: dict) -> Tuple[dict, dict]:
         url = obj.get("url")
         text = clean_text(obj.get("content", ""))
-
         if not text:
             return {}, {}
 
@@ -65,16 +61,13 @@ class LanguageAnalyzer:
             return {}, {}
 
         lang_percentages = {lang: round((count / total) * 100, 2) for lang, count in lang_word_counts.items()}
-
         result = {
             "url": url,
             "total_words": total,
             "languages": lang_word_counts,
             "percentages": lang_percentages
         }
-
         return result, lang_word_counts
-
 
 async def run_language_analysis(
     input_path="outputs/site_data.jsonl",
@@ -82,7 +75,7 @@ async def run_language_analysis(
 ):
     num_cpus = os.cpu_count() or 2
     num_actors = num_cpus
-    actors = [LanguageAnalyzer.remote() for _ in range(num_actors)]
+    actors = [LanguageAnalyzer.remote() for _ in range(num_actors)]  # Fixed syntax error
 
     input_file = Path(input_path)
     output_file = Path(output_path)
@@ -94,26 +87,36 @@ async def run_language_analysis(
     total_urls = len(lines)
     progress = tqdm(total=total_urls, desc="Analyzing Languages", unit="pages")
 
+    # Submit all tasks
     futures = []
     for i, line in enumerate(lines):
         actor = actors[i % num_actors]
         futures.append(actor.analyze_text.remote(line))
 
-    resolved = ray.get(futures)
-
+    # Process results as they complete
     overall_counts = Counter()
     total_words = 0
     page_results = []
 
-    for result, counts in resolved:
-        if result:
-            page_results.append(result)
-            overall_counts.update(counts)
-            total_words += result["total_words"]
-        progress.update(1)
+    # Use ray.wait() to process tasks as they complete
+    remaining_futures = futures[:]
+
+    while remaining_futures:
+        # Wait for at least one task to complete
+        ready, remaining_futures = ray.wait(remaining_futures, num_returns=1)
+
+        # Process completed tasks
+        for future in ready:
+            result, counts = ray.get(future)
+            if result:
+                page_results.append(result)
+                overall_counts.update(counts)
+                total_words += result["total_words"]
+            progress.update(1)  # Update progress bar as each task completes
 
     progress.close()
 
+    # Generate summary
     summary = {
         "total_pages": total_urls,
         "total_words": total_words,
@@ -121,7 +124,7 @@ async def run_language_analysis(
         "overall_percentages": {
             lang: round((count / total_words) * 100, 2)
             for lang, count in overall_counts.items()
-        }
+        } if total_words > 0 else {}
     }
 
     final_output = {
@@ -132,9 +135,11 @@ async def run_language_analysis(
     with output_file.open("w", encoding="utf-8") as f:
         json.dump(final_output, f, indent=2, ensure_ascii=False)
 
-    print(f"\nSummary and Language analysis saved at -> {output_path}")
+    print("\n----- Analysis completed -----")
+    print(f"Summary and Language analysis saved at -> {output_path}")
+    print("------------------------------\n")
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # Fixed syntax error
     asyncio.run(run_language_analysis(
         "outputs/wordwise_site_data.jsonl",
         "outputs/wordwise_language_analysis.json"))

@@ -320,7 +320,9 @@ class SitemapAnalyzer:
             # Remove processed sitemaps
             self.sitemaps_to_process -= processed_sitemaps
 
-        logger.info(f"Discovered {len(self.discovered_urls)} webpage URLs")
+        print("\n--- Sitemap discovery completed ---")
+        print(f"Discovered {len(self.discovered_urls)} webpage URLs")
+
         return self.discovered_urls, True
 
     def close(self):

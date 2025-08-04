@@ -70,8 +70,9 @@ def main():
 
             # If `sitemap` URls success then continue with analysis
             if success:
-                print(f"\nCollected {len(urls)} URLs for analysis")
+                print(f"Collected {len(urls)} URLs for analysis")
                 write_to_json(list(urls), "sitemap")
+                print("-----------------------------------\n")
 
                 scraper = RayAsyncScraper(
                     urls=list(urls),
@@ -89,7 +90,9 @@ def main():
                 with UrlCrawler(url, stream_output_path, images_output_path, stream_error_path) as scraper:
                     max_pages = int(args.max_pages) if args.max_pages else None
                     scraped_links = scraper.scrape_all_links(max_pages)
-                    print(f"\nCollected {len(scraped_links)} URLs for analysis")
+                    print("\n\n--- URLs scraping completed ---")
+                    print(f"Collected {len(scraped_links)} URLs for analysis")
+                    print("-------------------------------\n")
                     write_to_json(list(scraped_links), "crawled")
 
         # Run languages analysis

@@ -127,11 +127,8 @@ class UrlCrawler:
 
                 with jsonlines.open(self.images_name, mode="a") as f:
                     for img in soup.find_all("img", src=True):
-                        f.write({
-                            "image_url": img["src"],
-                            "alt": img.get("alt"),
-                            "source_page": url
-                        })
+                        full_url = urljoin(self.url, img["src"])
+                        f.write(full_url)
 
                 links_to_check = []
                 for a_tag in soup.find_all("a", href=True):
@@ -217,6 +214,11 @@ class UrlCrawler:
 
             with jsonlines.open(self.file_name, mode='a') as writer:
                 writer.write({"url": url, "value": soup.get_text(separator="\n", strip=True)})
+
+            with jsonlines.open(self.images_name, mode="a") as f:
+                for img in soup.find_all("img", src=True):
+                    full_url = urljoin(self.url, img["src"])
+                    f.write(full_url)
 
             links_to_check = []
             for a_tag in soup.find_all("a", href=True):
