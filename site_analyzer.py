@@ -7,34 +7,26 @@ import threading
 from nt import cpu_count
 from datetime import datetime
 from ray.util.queue import Queue
-from fetch_crawl_urls import UrlCrawler
-from fetch_sitemap_urls import SitemapAnalyzer
-from sitemap_urls_crawler import RayAsyncScraper
-from language_analyzer import run_language_analysis
+
+# Import normally if main or not package
+if __name__ == "__main__" or __package__ is None:
+    from fetch_crawl_urls import UrlCrawler
+    from fetch_sitemap_urls import SitemapAnalyzer
+    from sitemap_urls_crawler import RayAsyncScraper
+    from language_analyzer import run_language_analysis
+
+# Import relative path if package usage
+else:
+    from .fetch_crawl_urls import UrlCrawler
+    from .fetch_sitemap_urls import SitemapAnalyzer
+    from .sitemap_urls_crawler import RayAsyncScraper
+    from .language_analyzer import run_language_analysis
 
 # Initialize ray (Configure to use all available CPUs)
 ray.init(num_cpus=None)
 
 # Initialize the ray queue
 data_queue = Queue()
-
-# Initialize the arguments parser
-# (python main.py <name> <url> --max_pages <number>)
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "name",
-    help="Name of site to analyze"
-)
-parser.add_argument(
-    "url",
-    help="URL of site to analyze"
-)
-parser.add_argument(
-    "--max_pages",
-    help="Max pages to analyse",
-    type=int,
-    required=False
-)
 
 # Helper function to write data to JSON file
 def write_to_json(urls: list, type: str) -> None:
@@ -46,13 +38,9 @@ def write_to_json(urls: list, type: str) -> None:
         print(f"Saved URLs to {name}_{type}_urls.json")
 
 # Main execution function
-def main():
+def start_analysis(brand_name: str, url: str, max_pages: int | None = None) -> dict:
     try:
-        # Get the `url` and `run_type` arguments
-        args = parser.parse_args()
-        url = args.url
-
-        name = args.name.lower().replace(" ", "_")
+        name = brand_name.lower().replace(" ", "_")
         stream_output_path = f"outputs/{name}_site_data.jsonl"
         stream_error_path = f"outputs/{name}_errors.jsonl"
         analysis_output_path = f"outputs/{name}_language_analysis.json"
@@ -88,7 +76,7 @@ def main():
             else:
                 print(f"Sitemap ineffective. Crawling {url} for links.")
                 with UrlCrawler(url, stream_output_path, images_output_path, stream_error_path) as scraper:
-                    max_pages = int(args.max_pages) if args.max_pages else None
+                    max_pages = int(max_pages) if max_pages else None
                     scraped_links = scraper.scrape_all_links(max_pages)
                     print("\n\n--- URLs scraping completed ---")
                     print(f"Collected {len(scraped_links)} URLs for analysis")
@@ -96,23 +84,49 @@ def main():
                     write_to_json(list(scraped_links), "crawled")
 
         # Run languages analysis
-        asyncio.run(run_language_analysis(
+        results = asyncio.run(run_language_analysis(
             stream_output_path,
             analysis_output_path
         ))
 
         # Print the exit time
         print(f"\n--- End time: {datetime.now().strftime('%H:%M:%S')} ---")
+        return results
 
     # Show message if keyboard interuption
     except KeyboardInterrupt:
         print("\nCrawling interrupted by user.")
+        return {}
 
     # Show error message on any error catched
     except Exception as e:
         print(f"An error occurred: {e}")
+        return {}
+
     finally:
         ray.shutdown()
 
 if __name__ == "__main__":
-    main()
+    # Initialize the arguments parser
+    # (python main.py <name> <url> --max_pages <number>)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "name",
+        help="Name of site to analyze"
+    )
+    parser.add_argument(
+        "url",
+        help="URL of site to analyze"
+    )
+    parser.add_argument(
+        "--max_pages",
+        help="Max pages to analyse",
+        type=int,
+        required=False
+    )
+
+    # Get the `url` and `run_type` arguments
+    args = parser.parse_args()
+    name = args.name
+    url = args.url
+    start_analysis(name, url)

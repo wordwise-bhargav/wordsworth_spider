@@ -70,9 +70,9 @@ class LanguageAnalyzer:
         return result, lang_word_counts
 
 async def run_language_analysis(
-    input_path="outputs/site_data.jsonl",
-    output_path="outputs/language_analysis.json"
-):
+    input_path: str = "outputs/site_data.jsonl",
+    output_path: str = "outputs/language_analysis.json"
+) -> dict:
     num_cpus = os.cpu_count() or 2
     num_actors = num_cpus
     actors = [LanguageAnalyzer.remote() for _ in range(num_actors)]  # Fixed syntax error
@@ -138,8 +138,12 @@ async def run_language_analysis(
     print("\n----- Analysis completed -----")
     print(f"Summary and Language analysis saved at -> {output_path}")
     print("------------------------------\n")
+    return summary
 
 if __name__ == "__main__":  # Fixed syntax error
-    asyncio.run(run_language_analysis(
-        "outputs/wordwise_site_data.jsonl",
-        "outputs/wordwise_language_analysis.json"))
+    asyncio.run(
+        run_language_analysis(
+            "outputs/wordwise_site_data.jsonl",
+            "outputs/wordwise_language_analysis.json"
+        )
+    )
