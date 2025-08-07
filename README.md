@@ -246,7 +246,7 @@ flowchart TD
     B -- No --> D[Crawl with UrlCrawler]
     C --> E[Collect Content + Images]
     D --> E
-    E --> F[Language Analysis (Text)]
+    E --> F[Language Analysis Text]
     E --> G[Image OCR + Analysis]
     F --> H[Outputs as JSON/JSONL]
     G --> H
