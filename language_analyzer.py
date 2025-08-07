@@ -85,7 +85,7 @@ async def run_language_analysis(
         lines = [json.loads(line.strip()) for line in infile if line.strip()]
 
     total_urls = len(lines)
-    progress = tqdm(total=total_urls, desc="Analyzing Languages", unit="pages")
+    progress = tqdm(total=total_urls, desc="Analyzing Text", unit="pages")
 
     # Submit all tasks
     futures = []

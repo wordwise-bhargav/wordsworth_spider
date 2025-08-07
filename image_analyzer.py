@@ -1,6 +1,5 @@
 import json
 import requests
-import jsonlines
 from tqdm import tqdm
 
 # API Key
@@ -17,7 +16,11 @@ def detect_text_with_language_detection(api_key, image_url, show_fulltext=False)
             }
         ]
     }
-    response = requests.post(vision_url, data=json.dumps(payload), headers={'Content-Type': 'application/json'})
+    response = requests.post(
+        vision_url,
+        data=json.dumps(payload),
+        headers={'Content-Type': 'application/json'}
+    )
 
     if response.status_code != 200:
         return {
@@ -83,20 +86,38 @@ def detect_text_with_language_detection(api_key, image_url, show_fulltext=False)
 
 
 def run_image_analysis(input_file: str, output_filename: str) -> dict:
-    indian_languages = {
-        "hi", "bn", "te", "ta", "gu", "mr", "kn", "ml", "or", "pa", "as", "gom", "doi"
+    language_fullname_map = {
+        "en": "English",
+        "hi": "Hindi",
+        "bn": "Bengali",
+        "te": "Telugu",
+        "ta": "Tamil",
+        "gu": "Gujarati",
+        "mr": "Marathi",
+        "kn": "Kannada",
+        "ml": "Malayalam",
+        "or": "Oriya",
+        "pa": "Punjabi",
+        "as": "Assamese",
+        "others": "Others"
     }
+
+    indian_languages = {
+        "hi", "bn", "te", "ta", "gu", "mr", "kn", "ml", "or", "pa", "as"
+    }
+
     output_keys = list(indian_languages) + ["en"]
-    word_counts = {lang: 0 for lang in output_keys}
+    word_counts = {language_fullname_map[lang]: 0 for lang in output_keys}
     word_counts["others"] = 0
     word_counts["total"] = 0
 
-    # Read image URLs
+    # ✅ Read plain text lines from file
     url_set = set()
-    with jsonlines.open(input_file) as reader:
+    with open(input_file, "r", encoding="utf-8") as reader:
         for line in reader:
-            urls = line.strip().split()
-            url_set.update(urls)
+            url = line.strip().strip('"')
+            if url:
+                url_set.add(url)
 
     # Analyze each image with progress bar
     progress = tqdm(url_set, desc="Analyzing Images", unit="img")
@@ -106,8 +127,8 @@ def run_image_analysis(input_file: str, output_filename: str) -> dict:
             total = result["data"]["total"]
             word_counts["total"] += total
             for lang, count in result["data"]["languages"].items():
-                if lang in word_counts:
-                    word_counts[lang] += count
+                if lang in language_fullname_map:
+                    word_counts[language_fullname_map[lang]] += count
                 else:
                     word_counts["others"] += count
         else:
