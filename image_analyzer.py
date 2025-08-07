@@ -4,7 +4,7 @@ import jsonlines
 from tqdm import tqdm
 
 # API Key
-API_KEY = "AIzaSyBffOv-K3BdTpo8kIEbFdL0OSlZLDpMFhw"
+API_KEY = "<GOOGLE_CLOUD_VISION_API_KEY>"
 
 # Detects text from a URL and counts words per language using improved language detection.
 def detect_text_with_language_detection(api_key, image_url, show_fulltext=False):
