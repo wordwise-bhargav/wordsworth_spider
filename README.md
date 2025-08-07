@@ -1,102 +1,98 @@
-# 🕷️ Web Content Analyzer
+# Wordsworth Spider: Distributed Web Content Analyzer
 
-A fully automated and adaptive pipeline to:
-- Crawl websites or extract URLs from sitemaps
-- Scrape webpage content and image URLs
-- Detect and analyze language distribution across pages
-- Output rich structured analytics
+An intelligent, distributed system for **website crawling**, **text and image extraction**, and **language detection**, optimized for real-world websites across India and beyond.
 
-Built using **Ray**, **asyncio**, and **aiohttp**, this project supports English and 12 Indian languages, scales across CPUs, and handles real-world websites with adaptive fault-tolerance.
+Built with **Ray**, **asyncio**, and **aiohttp**, this scraper scales dynamically, handles sitemap and crawl-based discovery, and performs rich **language analytics** (for 12 Indian languages + English) on both **page content** and **images**.
 
 ---
 
-## 📦 Features
+## Features
 
-- 🌐 Sitemap-aware scraping with fallback to full crawling
-- ⚡ High-speed, concurrency-adaptive async scraping
-- 🖼️ Image URL collection from all pages
-- 🧠 Language analysis per page using `langdetect`
-- 📊 Overall summary of languages and word counts
-- 💻 CLI & programmatic usage, optimized with Ray multiprocessing
+* Sitemap discovery with robots.txt and common-path fallback
+* URL crawler with normalized deduplication and batch async fetches
+* Adaptive Ray-based concurrency for scraping with auto-throttling
+* Image URL extraction with optional OCR + language detection
+* Language analysis of web pages and image text (Google Vision API)
+* CLI and Python usage with automatic output management
+* Streamed JSONL outputs to handle large-scale websites (100k+ URLs)
 
 ---
 
-## 🛠️ Installation
-
-> Recommended: Use a virtual environment with [uv](https://github.com/astral-sh/uv)
+## File Structure
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/your-repo.git
-cd your-repo
+.
+├── fetch_crawl_urls.py         # Fallback URL crawler using Ray + aiohttp
+├── fetch_sitemap_urls.py       # Sitemap discovery and parsing logic
+├── sitemap_urls_crawler.py     # Adaptive Ray-based async scraper
+├── image_analyzer.py           # Language-aware OCR on image URLs (Google Vision)
+├── language_analyzer.py        # Language detection on textual content using langdetect
+├── site_analyzer.py            # Entrypoint for CLI + `start_analysis` API
+├── requirements.txt            # All required dependencies
+└── outputs/                    # All generated data and analysis results
+```
 
-# Create and activate a virtual environment
+---
+
+## Installation
+
+### Create and Activate Virtual Environment
+
+```bash
+git clone https://github.com/yourusername/wordsworth_spider.git
+cd wordsworth_spider
+
+# Use your environment manager
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+source .venv/bin/activate  # or `.venv\Scripts\activate` on Windows
+```
 
-# Install dependencies
-uv pip install -r requirements.txt
-````
+### Install Dependencies
 
-### ✅ Requirements
+```bash
+pip install -r requirements.txt
+```
 
-Dependencies are listed in `requirements.txt`, and include:
-
-* `aiohttp`
-* `beautifulsoup4`
-* `jsonlines`
-* `langdetect`
-* `lxml`
-* `requests`
-* `ray`
-* `tqdm`
+**Python 3.9+ is recommended.**
 
 ---
 
-## 🚀 CLI Usage
+## CLI Usage
 
-You can run the entire analysis from the command line:
+Run full analysis with a single command:
 
 ```bash
-python site_analyzer.py <name> <url> [--max_pages <N>]
+python site_analyzer.py <brand_name> <site_url> [--max_pages N]
 ```
 
 ### Arguments
 
-| Arg           | Description                                                  |
-| ------------- | ------------------------------------------------------------ |
-| `name`        | Name of the site or brand (used in output filenames)         |
-| `url`         | The root URL of the website to analyze                       |
-| `--max_pages` | (Optional) Fallback page limit for crawling if sitemap fails |
+| Argument      | Description                                                |
+| ------------- | ---------------------------------------------------------- |
+| `brand_name`  | Used as the output file prefix                             |
+| `site_url`    | URL of the website to analyze                              |
+| `--max_pages` | Optional. If sitemap fails, limits fallback crawling pages |
 
 ### Example
 
 ```bash
-python site_analyzer.py Wordwise https://www.wordwise.one/ --max_pages 500
+python site_analyzer.py Wordwise https://www.wordwise.one/ --max_pages 1000
 ```
 
----
+This will:
 
-## 📁 Output Files
-
-All output is saved to the `outputs/` directory:
-
-| File                            | Description                                            |
-| ------------------------------- | ------------------------------------------------------ |
-| `<name>_site_data.jsonl`        | Scraped text content for each URL                      |
-| `<name>_images_urls.jsonl`      | All image URLs encountered                             |
-| `<name>_language_analysis.json` | Page-wise and overall language statistics              |
-| `<name>_sitemap_urls.json`      | URLs extracted from sitemap                            |
-| `<name>_crawled_urls.json`      | URLs collected via crawling (if sitemap fails)         |
-| `<name>_errors.jsonl`           | Pages that failed during scraping, with exception info |
+* Try sitemap discovery and scraping
+* Fall back to crawling if necessary
+* Analyze all page text and image content
+* Output all results in `outputs/wordwise_*`
 
 ---
 
-## 🧩 Programmatic Usage
+## Programmatic Usage
 
-### 🔁 High-Level Usage (One Call)
+You can also use the entire tool as a Python module:
 
-Use `start_analysis()` to run the **entire pipeline** in one line:
+### Run the Full Pipeline
 
 ```python
 from site_analyzer import start_analysis
@@ -104,111 +100,123 @@ from site_analyzer import start_analysis
 results = start_analysis(
     brand_name="Wordwise",
     url="https://www.wordwise.one/",
-    max_pages=500  # Optional fallback limit
+    max_pages=1000  # Optional
 )
 ```
 
-This will:
-
-* Try to extract URLs from sitemap
-* Crawl pages if sitemap is missing or fails
-* Scrape page content and images
-* Run per-page and overall language detection
-* Write results to the `outputs/` folder
-* Returns the summary of the analysis
+Returns a summary dictionary of both text and image language analysis.
 
 ---
 
-### 🧩 Component Usage
+## Component Modules
 
-#### Sitemap Extraction
+### Sitemap Extraction
 
 ```python
 from fetch_sitemap_urls import SitemapAnalyzer
 
 with SitemapAnalyzer("https://example.com") as analyzer:
-    urls, found = analyzer.get_all_urls()
+    urls, success = analyzer.get_all_urls()
 ```
 
-#### URL Crawler (Fallback)
+### Fallback URL Crawler
 
 ```python
 from fetch_crawl_urls import UrlCrawler
 
-with UrlCrawler(start_url, text_file, image_file, error_file) as crawler:
-    links = crawler.scrape_all_links(max_pages=500)
+with UrlCrawler(
+    url="https://example.com",
+    file_name="outputs/content.jsonl",
+    images_name="outputs/images.jsonl",
+    error_file="outputs/errors.jsonl"
+) as crawler:
+    links = crawler.scrape_all_links(max_pages=1000)
 ```
 
-#### Async Scraper (Ray-based)
+### Async Sitemap Scraper (Ray)
 
 ```python
 from sitemap_urls_crawler import RayAsyncScraper
 import asyncio
 
 scraper = RayAsyncScraper(
-    urls=urls,
-    output_file="outputs/scraped.jsonl",
+    urls=my_urls,
+    output_file="outputs/content.jsonl",
     images_file="outputs/images.jsonl",
-    error_file="outputs/errors.jsonl",
+    error_file="outputs/errors.jsonl"
 )
 asyncio.run(scraper.scrape())
 ```
 
-#### Language Analysis
+### Language Analyzer (Text)
 
 ```python
 from language_analyzer import run_language_analysis
 import asyncio
 
 asyncio.run(run_language_analysis(
-    input_path="outputs/scraped.jsonl",
+    input_path="outputs/content.jsonl",
     output_path="outputs/lang_summary.json"
 ))
 ```
 
----
+### Image Analyzer (Google Vision OCR)
 
-## 📊 Supported Languages
+```python
+from image_analyzer import run_image_analysis
 
-This tool detects content in the following languages:
-
-* English
-* Hindi
-* Bengali
-* Telugu
-* Marathi
-* Tamil
-* Urdu
-* Gujarati
-* Kannada
-* Malayalam
-* Odia
-* Punjabi
-* Assamese
+run_image_analysis(
+    input_file="outputs/images.jsonl",
+    output_filename="outputs/image_lang_summary.json"
+)
+```
 
 ---
 
-## ⚙️ Tuning for Large Sites
+## Output Files
 
-This tool handles large sites (100k+ pages) via:
-
-* 🧠 Adaptive concurrency (automatically scales up/down actors based on error rate)
-* ✅ Ray-based parallelism based on available CPUs
-* 💾 Streamed JSONL output to avoid memory overload
-
-You can fine-tune:
-
-* `max_actors`, `min_actors`, and `batch_size` in `RayAsyncScraper`
-* `--max_pages` if sitemap fails
-* Ray cluster settings if scaling across nodes
-
-> No manual tuning is required for most real-world websites. However, if scraping hundreds of thousands of pages, consider horizontal scaling or enabling Ray autoscaling.
+| File                            | Description                                     |
+| ------------------------------- | ----------------------------------------------- |
+| `<name>_site_data.jsonl`        | Text content scraped from each webpage          |
+| `<name>_images_urls.jsonl`      | All image URLs extracted                        |
+| `<name>_errors.jsonl`           | Error logs for failed URLs                      |
+| `<name>_sitemap_urls.json`      | URLs discovered via sitemap                     |
+| `<name>_crawled_urls.json`      | URLs collected via crawling (if sitemap fails)  |
+| `<name>_language_analysis.json` | Page-wise and overall language analysis of text |
+| `<name>_image_analysis.json`    | Word-level language analysis of image content   |
 
 ---
 
-## 🧹 Cleanup
+## Supported Languages
 
-To reset outputs:
+| Code | Language  |
+| ---- | --------- |
+| `en` | English   |
+| `hi` | Hindi     |
+| `bn` | Bengali   |
+| `te` | Telugu    |
+| `mr` | Marathi   |
+| `ta` | Tamil     |
+| `ur` | Urdu      |
+| `gu` | Gujarati  |
+| `kn` | Kannada   |
+| `ml` | Malayalam |
+| `or` | Odia      |
+| `pa` | Punjabi   |
+| `as` | Assamese  |
+
+Other detected languages are grouped under `"others"`.
+
+---
+
+## Notes & Tips
+
+* Ensure Ray is properly installed and initialized; avoid multiple runs in the same process.
+* Google Vision API key is required for `image_analyzer.py`. Set it via `API_KEY` in the file.
+* Outputs are saved under the `outputs/` directory. Make sure it exists or is created.
+* Use `--max_pages` if crawling large sites without valid sitemaps to avoid runaway crawls.
+* If you use the module inside a package, the internal imports are already handled (`__package__` aware).
+* Clean all outputs quickly via:
 
 ```bash
 rm -rf outputs/*
@@ -216,12 +224,30 @@ rm -rf outputs/*
 
 ---
 
-## 🧠 Behind the Scenes
+## Advanced Tuning for Scale
 
-* 🌐 Sitemap-aware discovery with robots.txt fallback
-* ⚙️ Fully async scraping with exponential backoff
-* 📈 Language chunking and per-word classification
-* 💾 Streamed JSONL output for scalable storage
-* 🧠 Ray-powered concurrency using `ray.remote` actors
+| Parameter            | Purpose                                    | Location              |
+| -------------------- | ------------------------------------------ | --------------------- |
+| `max_actors`         | Max Ray actors per scrape batch            | `RayAsyncScraper`     |
+| `throttle_threshold` | Max error rate before reducing concurrency | `RayAsyncScraper`     |
+| `batch_size`         | URLs per Ray actor                         | `RayAsyncScraper`     |
+| `timeout`            | Per-request timeout in seconds             | `AsyncAiohttpFetcher` |
+
+The system auto-throttles based on error rate and uses exponential backoff retries.
 
 ---
+
+## How It Works
+
+```mermaid
+flowchart TD
+    A[Input URL] --> B{Sitemap Found?}
+    B -- Yes --> C[Scrape with RayAsyncScraper]
+    B -- No --> D[Crawl with UrlCrawler]
+    C --> E[Collect Content + Images]
+    D --> E
+    E --> F[Language Analysis (Text)]
+    E --> G[Image OCR + Analysis]
+    F --> H[Outputs as JSON/JSONL]
+    G --> H
+```

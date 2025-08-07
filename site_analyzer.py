@@ -14,6 +14,7 @@ if __name__ == "__main__" or __package__ is None:
     from fetch_sitemap_urls import SitemapAnalyzer
     from sitemap_urls_crawler import RayAsyncScraper
     from language_analyzer import run_language_analysis
+    from image_analyzer import run_image_analysis
 
 # Import relative path if package usage
 else:
@@ -21,6 +22,7 @@ else:
     from .fetch_sitemap_urls import SitemapAnalyzer
     from .sitemap_urls_crawler import RayAsyncScraper
     from .language_analyzer import run_language_analysis
+    from .image_analyzer import run_image_analysis
 
 # Initialize ray (Configure to use all available CPUs)
 ray.init(num_cpus=None)
@@ -45,6 +47,7 @@ def start_analysis(brand_name: str, url: str, max_pages: int | None = None) -> d
         stream_error_path = f"outputs/{name}_errors.jsonl"
         analysis_output_path = f"outputs/{name}_language_analysis.json"
         images_output_path = f"outputs/{name}_images_urls.jsonl"
+        image_analysis_output_path = f"outputs/{name}_image_analysis.json"
 
         # Ensure output directory exists
         os.makedirs("outputs", exist_ok=True)
@@ -84,14 +87,19 @@ def start_analysis(brand_name: str, url: str, max_pages: int | None = None) -> d
                     write_to_json(list(scraped_links), "crawled")
 
         # Run languages analysis
-        results = asyncio.run(run_language_analysis(
+        text_results = asyncio.run(run_language_analysis(
             stream_output_path,
             analysis_output_path
         ))
 
+        image_results = run_image_analysis(images_output_path, image_analysis_output_path)
+
         # Print the exit time
         print(f"\n--- End time: {datetime.now().strftime('%H:%M:%S')} ---")
-        return results
+        return {
+            "text": text_results,
+            "image": image_results
+        }
 
     # Show message if keyboard interuption
     except KeyboardInterrupt:
@@ -129,4 +137,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     name = args.name
     url = args.url
-    start_analysis(name, url)
+    results = start_analysis(name, url)
+    print(json.dumps(results, indent=2, ensure_ascii=False))

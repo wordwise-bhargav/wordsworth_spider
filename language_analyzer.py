@@ -135,8 +135,8 @@ async def run_language_analysis(
     with output_file.open("w", encoding="utf-8") as f:
         json.dump(final_output, f, indent=2, ensure_ascii=False)
 
-    print("\n----- Analysis completed -----")
-    print(f"Summary and Language analysis saved at -> {output_path}")
+    print("\n----- Text analysis completed -----")
+    print(f"Summary and Language analysis of texts saved at -> {output_path}")
     print("------------------------------\n")
     return summary
 

@@ -9,7 +9,6 @@ from typing import List
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-
 @ray.remote
 class AsyncAiohttpFetcher:
     def __init__(self, images_path: Path, timeout: int = 10, max_retries: int = 3):
@@ -64,7 +63,6 @@ class AsyncAiohttpFetcher:
         async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
             tasks = [self._fetch(session, url) for url in urls]
             return await asyncio.gather(*tasks)
-
 
 class RayAsyncScraper:
     def __init__(
