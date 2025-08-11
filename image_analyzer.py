@@ -4,18 +4,20 @@ from tqdm import tqdm
 
 API_KEY = "AIzaSyBffOv-K3BdTpo8kIEbFdL0OSlZLDpMFhw"
 
-# Set lower CPU usage per task to allow higher parallelism
+# Allow up to 16 images per Vision API call
 @ray.remote(num_cpus=0.5)
-def detect_text_with_language_detection_ray(api_key, image_url):
+def detect_text_with_language_detection_batch_ray(api_key, image_urls):
     import requests
 
     vision_url = f"https://vision.googleapis.com/v1/images:annotate?key={api_key}"
+
     payload = {
         "requests": [
             {
-                "image": {"source": {"imageUri": image_url}},
+                "image": {"source": {"imageUri": url}},
                 "features": [{"type": "DOCUMENT_TEXT_DETECTION"}]
             }
+            for url in image_urls
         ]
     }
 
@@ -27,62 +29,76 @@ def detect_text_with_language_detection_ray(api_key, image_url):
         )
 
         if response.status_code != 200:
-            return {
-                "success": False,
-                "error": f"Error: {response.status_code} - {response.text}",
-                "data": {"total": 0}
-            }
+            return [
+                {"success": False,
+                 "error": f"Error: {response.status_code} - {response.text}",
+                 "data": {"total": 0}}
+                for _ in image_urls
+            ]
 
         data = response.json()
-        full_text = data['responses'][0].get('fullTextAnnotation', {}).get('text', '')
+        results = []
 
-        language_word_counts = {}
-        total_word_count = 0
-        document_language = 'en'
+        for idx, resp in enumerate(data.get("responses", [])):
+            try:
+                full_text = resp.get('fullTextAnnotation', {}).get('text', '')
 
-        if ('property' in data['responses'][0].get('fullTextAnnotation', {}) and
-            'detectedLanguages' in data['responses'][0]['fullTextAnnotation']['property']):
-            document_language = data['responses'][0]['fullTextAnnotation']['property']['detectedLanguages'][0]['languageCode']
+                language_word_counts = {}
+                total_word_count = 0
+                document_language = 'en'
 
-        for page in data['responses'][0].get('fullTextAnnotation', {}).get('pages', []):
-            for block in page.get('blocks', []):
-                block_language = document_language
-                if 'property' in block and 'detectedLanguages' in block['property']:
-                    block_language = block['property']['detectedLanguages'][0]['languageCode']
+                if ('property' in resp.get('fullTextAnnotation', {}) and
+                    'detectedLanguages' in resp['fullTextAnnotation']['property']):
+                    document_language = resp['fullTextAnnotation']['property']['detectedLanguages'][0]['languageCode']
 
-                for paragraph in block.get('paragraphs', []):
-                    paragraph_language = block_language
-                    if 'property' in paragraph and 'detectedLanguages' in paragraph['property']:
-                        paragraph_language = paragraph['property']['detectedLanguages'][0]['languageCode']
+                for page in resp.get('fullTextAnnotation', {}).get('pages', []):
+                    for block in page.get('blocks', []):
+                        block_language = document_language
+                        if 'property' in block and 'detectedLanguages' in block['property']:
+                            block_language = block['property']['detectedLanguages'][0]['languageCode']
 
-                    for word in paragraph.get('words', []):
-                        total_word_count += 1
-                        language_code = paragraph_language
-                        if 'property' in word and 'detectedLanguages' in word['property']:
-                            language_code = word['property']['detectedLanguages'][0]['languageCode']
+                        for paragraph in block.get('paragraphs', []):
+                            paragraph_language = block_language
+                            if 'property' in paragraph and 'detectedLanguages' in paragraph['property']:
+                                paragraph_language = paragraph['property']['detectedLanguages'][0]['languageCode']
 
-                        language_word_counts[language_code] = language_word_counts.get(language_code, 0) + 1
+                            for word in paragraph.get('words', []):
+                                total_word_count += 1
+                                language_code = paragraph_language
+                                if 'property' in word and 'detectedLanguages' in word['property']:
+                                    language_code = word['property']['detectedLanguages'][0]['languageCode']
 
-        if total_word_count == 0:
-            words = full_text.split()
-            total_word_count = len(words)
-            language_word_counts[document_language] = total_word_count
+                                language_word_counts[language_code] = language_word_counts.get(language_code, 0) + 1
 
-        return {
-            "success": True,
-            "error": None,
-            "data": {
-                "languages": language_word_counts,
-                "total": total_word_count
-            }
-        }
+                if total_word_count == 0:
+                    words = full_text.split()
+                    total_word_count = len(words)
+                    language_word_counts[document_language] = total_word_count
+
+                results.append({
+                    "success": True,
+                    "error": None,
+                    "data": {
+                        "languages": language_word_counts,
+                        "total": total_word_count
+                    }
+                })
+            except Exception as e:
+                results.append({"success": False, "error": str(e), "data": {"total": 0}})
+
+        return results
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "data": {"total": 0}
-        }
+        return [
+            {"success": False, "error": str(e), "data": {"total": 0}}
+            for _ in image_urls
+        ]
+
+
+def chunk_list(lst, chunk_size):
+    """Yield successive chunks of given size."""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
 
 
 def run_image_analysis(input_file: str, output_filename: str) -> dict:
@@ -119,23 +135,24 @@ def run_image_analysis(input_file: str, output_filename: str) -> dict:
             if url:
                 url_set.add(url)
 
-    # Submit tasks to Ray
+    url_list = list(url_set)
+
+    # Split into batches of up to 16 images
     futures = [
-        detect_text_with_language_detection_ray.remote(API_KEY, image_url)
-        for image_url in url_set
+        detect_text_with_language_detection_batch_ray.remote(API_KEY, batch)
+        for batch in chunk_list(url_list, 16)
     ]
 
-    # Process all results in parallel with live progress
     results = []
     remaining = list(futures)
 
-    with tqdm(total=len(futures), desc="Analyzing Images", unit="img") as pbar:
+    with tqdm(total=len(url_list), desc="Analyzing Images", unit="img") as pbar:
         while remaining:
-            done, remaining = ray.wait(remaining, num_returns=min(8, len(remaining)), timeout=1.0)
+            done, remaining = ray.wait(remaining, num_returns=1, timeout=1.0)
             for obj_ref in done:
-                result = ray.get(obj_ref)
-                results.append(result)
-                pbar.update(1)
+                batch_results = ray.get(obj_ref)
+                results.extend(batch_results)
+                pbar.update(len(batch_results))
 
     # Process results
     for result in results:
@@ -154,7 +171,6 @@ def run_image_analysis(input_file: str, output_filename: str) -> dict:
         for lang, count in word_counts.items() if lang != "total"
     }
 
-    # Prepare final result
     result = {
         "word_counts": word_counts,
         "percentages": percentages
@@ -164,7 +180,7 @@ def run_image_analysis(input_file: str, output_filename: str) -> dict:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
     print("\n----- Image analysis completed -----")
-    print(f"Summary and Language analysis of images saved at -> {output_filename}")
+    print(f"Summary saved at -> {output_filename}")
     print("------------------------------\n")
 
     return result
@@ -177,5 +193,4 @@ if __name__ == "__main__":
     output_file = sys.argv[2] if len(sys.argv) > 2 else "outputs/wordwise_image_analysis.json"
 
     ray.init(ignore_reinit_error=True)
-
     run_image_analysis(input_file, output_file)
