@@ -86,13 +86,17 @@ def start_analysis(brand_name: str, url: str, max_pages: int | None = None) -> d
                     print("-------------------------------\n")
                     write_to_json(list(scraped_links), "crawled")
 
-        # Run languages analysis
+        # Run languages analysis on text
         text_results = asyncio.run(run_language_analysis(
             stream_output_path,
             analysis_output_path
         ))
 
-        image_results = run_image_analysis(images_output_path, image_analysis_output_path)
+        # Run languages analysis on images
+        image_results = asyncio.run(run_image_analysis(
+            images_output_path,
+            image_analysis_output_path
+        ))
 
         # Print the exit time
         print(f"\n--- End time: {datetime.now().strftime('%H:%M:%S')} ---")
